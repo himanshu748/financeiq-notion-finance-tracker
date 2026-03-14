@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinanceIQ — AI Finance Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0f0f0f;
+  --paper: #f5f0e8;
+  --cream: #ede8db;
+  --rule: #d4cfc3;
+  --accent: #c8401a;
+  --accent2: #1a6bc8;
+  --gold: #c89b1a;
+  --muted: #7a7468;
+  --surface: #ffffff;
+  --green: #1a8c4e;
+  --red: #c8401a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'IBM Plex Sans', sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+/* ── Newspaper-style noise texture ── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 999;
+  opacity: 0.4;
+}
+
+/* ── Masthead ── */
+.masthead {
+  border-bottom: 3px double var(--ink);
+  padding: 20px 40px 16px;
+  display: flex;
+  align-items: baseline;
+  gap: 24px;
+  background: var(--surface);
+}
+
+.masthead-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.8rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.masthead-title span { color: var(--accent); }
+
+.masthead-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+  border-left: 1px solid var(--rule);
+  padding-left: 24px;
+  line-height: 1.7;
+}
+
+.masthead-status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+.dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+/* ── Ticker bar ── */
+.ticker {
+  background: var(--ink);
+  color: var(--paper);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  padding: 6px 40px;
+  display: flex;
+  gap: 40px;
+  overflow: hidden;
+}
+
+.ticker-item { white-space: nowrap; }
+.ticker-item .up { color: #4ade80; }
+.ticker-item .down { color: #f87171; }
+
+/* ── Main layout ── */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 0;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 40px;
+  align-items: start;
+}
+
+/* ── Section headers ── */
+.section-flag {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--surface);
+  background: var(--ink);
+  display: inline-block;
+  padding: 3px 10px;
+  margin-bottom: 14px;
+}
+
+.section-flag.red { background: var(--accent); }
+.section-flag.blue { background: var(--accent2); }
+.section-flag.gold { background: var(--gold); color: var(--ink); }
+.section-flag.green { background: var(--green); }
+
+h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  line-height: 1.2;
+}
+
+.byline {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 12px;
+}
+
+/* ── Cards / panels ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.card + .card { border-top: none; margin-top: -24px; }
+
+/* ── Form elements ── */
+.field-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 6px;
+}
+
+input[type="text"], input[type="number"], select, textarea {
+  width: 100%;
+  background: var(--cream);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  padding: 10px 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s;
+  margin-bottom: 16px;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent2);
+  background: var(--surface);
+}
+
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ── Buttons ── */
+.btn {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 12px 24px;
+  border: 2px solid var(--ink);
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+  background: var(--surface);
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+
+.btn:hover { background: var(--ink); color: var(--paper); }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn.primary { background: var(--ink); color: var(--paper); }
+.btn.primary:hover { background: var(--accent); border-color: var(--accent); }
+.btn.danger { border-color: var(--accent); color: var(--accent); }
+.btn.danger:hover { background: var(--accent); color: var(--surface); }
+
+/* ── Drop zone ── */
+.drop-zone {
+  border: 2px dashed var(--rule);
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 16px;
+  position: relative;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--accent2);
+  background: rgba(26,107,200,0.04);
+}
+.drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.drop-zone-icon { font-size: 2rem; margin-bottom: 8px; }
+.drop-zone-text {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ── Manual entry ── */
+.tx-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 100px auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.tx-row input { margin-bottom: 0; }
+
+.remove-btn {
+  width: 32px; height: 32px;
+  background: none;
+  border: 1px solid var(--rule);
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.remove-btn:hover { background: var(--red); color: white; border-color: var(--red); }
+
+/* ── Sidebar ── */
+.sidebar { padding-left: 32px; border-left: 1px solid var(--rule); }
+
+/* ── Log ── */
+.log-panel {
+  background: var(--ink);
+  color: #e2e8d0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  padding: 16px;
+  height: 260px;
+  overflow-y: auto;
+  line-height: 1.9;
+  margin-bottom: 20px;
+}
+
+.log-line { display: flex; gap: 10px; }
+.log-ts { color: #556; flex-shrink: 0; }
+.log-ok { color: #4ade80; }
+.log-err { color: #f87171; }
+.log-warn { color: #fbbf24; }
+.log-dim { color: #6b7280; }
+
+/* ── Stats chips ── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.stat-chip {
+  padding: 12px;
+  border: 1px solid var(--rule);
+  background: var(--cream);
+}
+
+.stat-num {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  display: block;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-num.green { color: var(--green); }
+.stat-num.red { color: var(--red); }
+.stat-num.gold { color: var(--gold); }
+
+.stat-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+/* ── Notion links ── */
+.notion-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--cream);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent2);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--accent2);
+  text-decoration: none;
+  margin-bottom: 8px;
+  word-break: break-all;
+  transition: background 0.15s;
+}
+.notion-link:hover { background: rgba(26,107,200,0.07); }
+
+/* ── Budget editor ── */
+.budget-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+}
+
+.budget-label { color: var(--ink); }
+.budget-input {
+  width: 90px;
+  text-align: right;
+  margin-bottom: 0 !important;
+}
+
+/* ── Spinner ── */
+.spin {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.thinking { animation: blink 1.3s ease infinite; }
+
+/* ── Steps indicator ── */
+.steps {
+  display: flex;
+  gap: 0;
+  margin-bottom: 28px;
+  border: 1px solid var(--rule);
+  overflow: hidden;
+}
+
+.step {
+  flex: 1;
+  padding: 10px 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  text-align: center;
+  border-right: 1px solid var(--rule);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.step:last-child { border-right: none; }
+.step.active { background: var(--ink); color: var(--paper); }
+.step.done { background: var(--green); color: white; }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .layout { grid-template-columns: 1fr; padding: 20px; }
+  .sidebar { padding-left: 0; border-left: none; border-top: 1px solid var(--rule); padding-top: 24px; margin-top: 24px; }
+  .masthead { padding: 16px 20px; flex-wrap: wrap; }
+  .masthead-title { font-size: 2rem; }
+  .tx-row { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- Masthead -->
+<header class="masthead">
+  <div>
+    <div class="masthead-title">Finance<span>IQ</span></div>
+  </div>
+  <div class="masthead-meta">
+    AI-Powered Finance Tracker<br>
+    Notion MCP Edition · <span id="todayDate"></span>
+  </div>
+  <div class="masthead-status">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">connecting...</span>
+  </div>
+</header>
+
+<div class="ticker">
+  <div class="ticker-item">FOOD&DINING <span class="down">▼ avg $340/mo</span></div>
+  <div class="ticker-item">TRANSPORT <span class="up">▲ avg $120/mo</span></div>
+  <div class="ticker-item">ANOMALIES <span class="down">⚠ flagged automatically</span></div>
+  <div class="ticker-item">SAVINGS RATE <span class="up">▲ tracked monthly</span></div>
+  <div class="ticker-item">REPORTS <span class="up">✦ generated in Notion</span></div>
+</div>
+
+<div class="layout">
+
+  <!-- ── Main Column ── -->
+  <main>
+
+    <!-- Step progress -->
+    <div class="steps">
+      <div class="step active" id="step1">① Setup Workspace</div>
+      <div class="step" id="step2">② Import Expenses</div>
+      <div class="step" id="step3">③ Generate Report</div>
+      <div class="step" id="step4">④ Budget Check</div>
+    </div>
+
+    <!-- STEP 1: Setup -->
+    <div id="panel1">
+      <div class="section-flag">Step 1 — Workspace</div>
+      <h2>Initialize Your Finance Hub</h2>
+      <div class="byline">Creates the Expenses database and Reports folder in your Notion workspace</div>
+
+      <div class="card">
+        <label class="field-label">Notion Parent Page ID</label>
+        <input type="text" id="parentPageId" placeholder="e.g. abc123def456... (or set env NOTION_PARENT_PAGE_ID)" />
+
+        <button class="btn primary" onclick="setupWorkspace()">
+          <span id="setupLabel">⬡ Create FinanceIQ Workspace in Notion</span>
+        </button>
+      </div>
+
+      <div class="card" style="margin-top:-24px">
+        <div class="section-flag blue">What gets created</div>
+        <p style="font-size:0.85rem;line-height:1.7;color:var(--muted)">
+          ◆ <strong>💰 FinanceIQ Workspace</strong> hub page<br>
+          ◆ <strong>📊 Expenses</strong> database with 10 properties: date, amount, category, type, anomaly flag, AI notes, month<br>
+          ◆ <strong>📈 Reports</strong> page ready for monthly analysis
+        </p>
+      </div>
+    </div>
+
+    <!-- STEP 2: Import -->
+    <div id="panel2" style="display:none">
+      <div class="section-flag red">Step 2 — Import</div>
+      <h2>Add Your Transactions</h2>
+      <div class="byline">Upload a bank CSV export or enter transactions manually — Claude categorizes everything</div>
+
+      <div class="card">
+        <label class="field-label">Expenses Database ID <span style="color:var(--accent)">*</span></label>
+        <input type="text" id="dbId" placeholder="Paste the database ID from Step 1 output" />
+
+        <div class="section-flag" style="margin-bottom:12px">Option A — Upload CSV</div>
+        <div class="drop-zone" id="dropZone">
+          <input type="file" id="csvFile" accept=".csv" onchange="handleFile(this.files[0])" />
+          <div class="drop-zone-icon">📂</div>
+          <div class="drop-zone-text">
+            Drop your bank CSV here or click to browse<br>
+            <strong>Supports:</strong> Chase, Bank of America, Wells Fargo, Mint, and most bank exports
+          </div>
+        </div>
+        <div id="fileInfo" style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--muted);margin-bottom:12px"></div>
+        <button class="btn primary" id="uploadBtn" onclick="uploadCSV()" style="display:none">
+          <span id="uploadLabel">⬡ Categorize & Import to Notion</span>
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="section-flag blue">Option B — Manual Entry</div>
+        <div id="manualRows">
+          <div class="tx-row">
+            <input type="text" placeholder="2024-03-01" class="tx-date" />
+            <input type="text" placeholder="Whole Foods Market" class="tx-desc" />
+            <input type="number" placeholder="-84.50" class="tx-amount" step="0.01" />
+            <button class="remove-btn" onclick="removeRow(this)">×</button>
+          </div>
+        </div>
+        <button class="btn" onclick="addRow()" style="margin-top:8px;width:auto;padding:8px 16px;font-size:0.72rem">+ Add Row</button>
+        <button class="btn primary" onclick="submitManual()" style="margin-top:12px">
+          <span id="manualLabel">⬡ Add to Notion</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Report -->
+    <div id="panel3" style="display:none">
+      <div class="section-flag gold">Step 3 — Analysis</div>
+      <h2>Generate Monthly Report</h2>
+      <div class="byline">Claude reads your Notion data and writes a full financial analysis with insights</div>
+
+      <div class="card">
+        <label class="field-label">Expenses Database ID</label>
+        <input type="text" id="reportDbId" placeholder="From Step 1 output" />
+
+        <label class="field-label">Reports Page ID</label>
+        <input type="text" id="reportsPageId" placeholder="From Step 1 output" />
+
+        <div class="field-row">
+          <div>
+            <label class="field-label">Month</label>
+            <select id="reportMonth">
+              <option>January</option><option>February</option><option>March</option>
+              <option>April</option><option>May</option><option>June</option>
+              <option>July</option><option>August</option><option>September</option>
+              <option>October</option><option>November</option><option>December</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Year</label>
+            <input type="number" id="reportYear" value="2024" min="2020" max="2030" />
+          </div>
+        </div>
+
+        <button class="btn primary" onclick="generateReport()">
+          <span id="reportLabel">⬡ Generate Report in Notion</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 4: Budget -->
+    <div id="panel4" style="display:none">
+      <div class="section-flag green">Step 4 — Budget Check</div>
+      <h2>Budget vs Actual Analysis</h2>
+      <div class="byline">Set your monthly limits — Claude compares actuals and creates an alert page</div>
+
+      <div class="card">
+        <label class="field-label">Expenses Database ID</label>
+        <input type="text" id="budgetDbId" placeholder="From Step 1 output" />
+
+        <div class="field-row">
+          <div>
+            <label class="field-label">Month to Check</label>
+            <select id="budgetMonth">
+              <option>January</option><option>February</option><option>March</option>
+              <option>April</option><option>May</option><option>June</option>
+              <option>July</option><option>August</option><option>September</option>
+              <option>October</option><option>November</option><option>December</option>
+            </select>
+          </div>
+          <div></div>
+        </div>
+
+        <div class="section-flag" style="margin-bottom:12px">Monthly Budget Limits ($)</div>
+
+        <div id="budgetRows">
+          <div class="budget-row"><span class="budget-label">🍔 Food & Dining</span><input type="number" class="budget-input" data-cat="Food & Dining" value="400" /></div>
+          <div class="budget-row"><span class="budget-label">🚗 Transport</span><input type="number" class="budget-input" data-cat="Transport" value="150" /></div>
+          <div class="budget-row"><span class="budget-label">🛍️ Shopping</span><input type="number" class="budget-input" data-cat="Shopping" value="200" /></div>
+          <div class="budget-row"><span class="budget-label">💡 Utilities</span><input type="number" class="budget-input" data-cat="Utilities" value="120" /></div>
+          <div class="budget-row"><span class="budget-label">🏥 Healthcare</span><input type="number" class="budget-input" data-cat="Healthcare" value="100" /></div>
+          <div class="budget-row"><span class="budget-label">🎬 Entertainment</span><input type="number" class="budget-input" data-cat="Entertainment" value="80" /></div>
+          <div class="budget-row"><span class="budget-label">✈️ Travel</span><input type="number" class="budget-input" data-cat="Travel" value="150" /></div>
+          <div class="budget-row"><span class="budget-label">📺 Subscriptions</span><input type="number" class="budget-input" data-cat="Subscriptions" value="60" /></div>
+        </div>
+
+        <button class="btn danger" onclick="runBudgetCheck()" style="margin-top:16px">
+          <span id="budgetLabel">⚠ Run Budget Check in Notion</span>
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+
+    <div class="section-flag">Activity Log</div>
+    <div class="log-panel" id="logPanel">
+      <div class="log-line"><span class="log-ts">--:--</span><span class="log-dim">FinanceIQ ready. Start by setting up your Notion workspace.</span></div>
+    </div>
+
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-chip">
+        <span class="stat-num green" id="statAdded">—</span>
+        <span class="stat-label">Transactions</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-num red" id="statAnomalies">—</span>
+        <span class="stat-label">Anomalies</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-num gold" id="statIncome">—</span>
+        <span class="stat-label">Income</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-num red" id="statExpenses">—</span>
+        <span class="stat-label">Expenses</span>
+      </div>
+    </div>
+
+    <div id="linksArea"></div>
+
+    <div style="margin-top:20px">
+      <div class="section-flag blue">Navigation</div>
+      <button class="btn" onclick="showStep(1)" style="margin-bottom:6px">① Setup Workspace</button>
+      <button class="btn" onclick="showStep(2)" style="margin-bottom:6px">② Import Expenses</button>
+      <button class="btn" onclick="showStep(3)" style="margin-bottom:6px">③ Generate Report</button>
+      <button class="btn" onclick="showStep(4)">④ Budget Check</button>
+    </div>
+
+    <div style="margin-top:20px">
+      <div class="section-flag">Sample CSV Format</div>
+      <pre style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:var(--muted);line-height:1.7;background:var(--cream);padding:12px;border:1px solid var(--rule);white-space:pre-wrap">date,description,amount
+2024-03-01,Whole Foods,-84.50
+2024-03-02,Uber,-12.30
+2024-03-05,Salary,3200.00
+2024-03-07,Netflix,-15.99</pre>
+    </div>
+
+  </aside>
+</div>
+
+<script>
+  let currentFile = null;
+
+  // ── Init ────────────────────────────────────────────────────────────────────
+  document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-US', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  // Set current month in selects
+  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const curMonth = months[new Date().getMonth()];
+  ['reportMonth','budgetMonth'].forEach(id => {
+    document.getElementById(id).value = curMonth;
+  });
+  document.getElementById('reportYear').value = new Date().getFullYear();
+
+  checkHealth();
+
+  // ── Health ──────────────────────────────────────────────────────────────────
+  async function checkHealth() {
+    try {
+      const r = await fetch('/api/health');
+      const d = await r.json();
+      const ok = d.anthropic_key && d.notion_token;
+      document.getElementById('statusDot').className = 'dot' + (ok ? ' ok' : '');
+      document.getElementById('statusText').textContent = ok ? 'API Connected' : 'Missing env vars';
+      if (d.parent_page_id) {
+        document.getElementById('parentPageId').placeholder = 'Using NOTION_PARENT_PAGE_ID from env ✓';
+      }
+    } catch { document.getElementById('statusText').textContent = 'Offline'; }
+  }
+
+  // ── Step navigation ──────────────────────────────────────────────────────────
+  function showStep(n) {
+    [1,2,3,4].forEach(i => {
+      document.getElementById(`panel${i}`).style.display = i === n ? 'block' : 'none';
+      const step = document.getElementById(`step${i}`);
+      step.classList.remove('active');
+      if (i === n) step.classList.add('active');
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ── Logging ──────────────────────────────────────────────────────────────────
+  function log(msg, type = '') {
+    const panel = document.getElementById('logPanel');
+    const ts = new Date().toTimeString().slice(0,5);
+    const el = document.createElement('div');
+    el.className = 'log-line';
+    el.innerHTML = `<span class="log-ts">${ts}</span><span class="log-${type || 'dim'}">${msg}</span>`;
+    panel.appendChild(el);
+    panel.scrollTop = panel.scrollHeight;
+  }
+
+  function addLink(label, url) {
+    if (!url) return;
+    const area = document.getElementById('linksArea');
+    const a = document.createElement('a');
+    a.className = 'notion-link';
+    a.href = url;
+    a.target = '_blank';
+    a.textContent = `📄 ${label} →`;
+    area.appendChild(a);
+  }
+
+  function setStat(id, val) {
+    document.getElementById(id).textContent = val ?? '—';
+  }
+
+  function setBtn(labelId, loading, defaultText) {
+    const el = document.getElementById(labelId);
+    el.innerHTML = loading ? `<span class="spin"></span> Working...` : defaultText;
+    const btn = el.closest('button');
+    if (btn) btn.disabled = loading;
+  }
+
+  // ── Step 1: Setup ────────────────────────────────────────────────────────────
+  async function setupWorkspace() {
+    const pid = document.getElementById('parentPageId').value.trim();
+    setBtn('setupLabel', true, '⬡ Create FinanceIQ Workspace in Notion');
+    log('Setting up Notion workspace...', 'warn');
+    log('<span class="thinking">Claude is creating your Expenses DB and Reports folder...</span>', 'dim');
+    try {
+      const r = await fetch('/api/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parent_page_id: pid || undefined }),
+      });
+      const d = await r.json();
+      if (d.status === 'success') {
+        log('✓ Workspace created!', 'ok');
+        log('✓ Expenses database ready', 'ok');
+        log('✓ Reports page ready', 'ok');
+        const s = d.summary || {};
+        if (s.expenses_db_id) {
+          log(`DB ID: ${s.expenses_db_id}`, 'dim');
+          ['dbId','reportDbId','budgetDbId'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = s.expenses_db_id;
+          });
+        }
+        if (s.reports_page_id) {
+          const el = document.getElementById('reportsPageId');
+          if (el) el.value = s.reports_page_id;
+        }
+        addLink('FinanceIQ Workspace', s.workspace_url);
+        addLink('Expenses Database', s.expenses_db_url);
+        document.getElementById('step1').classList.add('done');
+      } else {
+        log(`✗ Error: ${JSON.stringify(d)}`, 'err');
+      }
+    } catch (e) { log(`✗ ${e.message}`, 'err'); }
+    setBtn('setupLabel', false, '⬡ Create FinanceIQ Workspace in Notion');
+  }
+
+  // ── Step 2: CSV upload ────────────────────────────────────────────────────────
+  function handleFile(file) {
+    currentFile = file;
+    document.getElementById('fileInfo').textContent = `✓ ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+    document.getElementById('uploadBtn').style.display = 'flex';
+    log(`File loaded: ${file.name}`, 'ok');
+  }
+
+  // Drag and drop
+  const dz = document.getElementById('dropZone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+
+  async function uploadCSV() {
+    const dbId = document.getElementById('dbId').value.trim();
+    if (!dbId) { log('⚠ Enter the Expenses DB ID first', 'warn'); return; }
+    if (!currentFile) { log('⚠ Select a CSV file first', 'warn'); return; }
+
+    setBtn('uploadLabel', true, '⬡ Categorize & Import to Notion');
+    log(`Parsing ${currentFile.name}...`, 'warn');
+    log('<span class="thinking">Claude is reading, categorizing, and flagging anomalies...</span>', 'dim');
+
+    const form = new FormData();
+    form.append('file', currentFile);
+    form.append('db_id', dbId);
+
+    try {
+      const r = await fetch('/api/upload-csv', { method: 'POST', body: form });
+      const d = await r.json();
+      if (d.status === 'success') {
+        const s = d.summary || {};
+        log(`✓ ${d.parsed_count} transactions parsed`, 'ok');
+        log(`✓ ${s.added ?? d.parsed_count} added to Notion`, 'ok');
+        if (s.anomalies) log(`⚠ ${s.anomalies} anomalies flagged`, 'warn');
+        setStat('statAdded', s.added ?? d.parsed_count);
+        setStat('statAnomalies', s.anomalies ?? 0);
+        document.getElementById('step2').classList.add('done');
+      } else {
+        log(`✗ ${JSON.stringify(d)}`, 'err');
+      }
+    } catch (e) { log(`✗ ${e.message}`, 'err'); }
+    setBtn('uploadLabel', false, '⬡ Categorize & Import to Notion');
+  }
+
+  // ── Manual entry ──────────────────────────────────────────────────────────────
+  function addRow() {
+    const container = document.getElementById('manualRows');
+    const row = document.createElement('div');
+    row.className = 'tx-row';
+    row.innerHTML = `
+      <input type="text" placeholder="${new Date().toISOString().slice(0,10)}" class="tx-date" />
+      <input type="text" placeholder="Merchant name" class="tx-desc" />
+      <input type="number" placeholder="-0.00" class="tx-amount" step="0.01" />
+      <button class="remove-btn" onclick="removeRow(this)">×</button>
+    `;
+    container.appendChild(row);
+  }
+
+  function removeRow(btn) {
+    btn.closest('.tx-row').remove();
+  }
+
+  async function submitManual() {
+    const dbId = document.getElementById('dbId').value.trim();
+    if (!dbId) { log('⚠ Enter the Expenses DB ID first', 'warn'); return; }
+
+    const rows = document.querySelectorAll('.tx-row');
+    const transactions = Array.from(rows).map(row => ({
+      date: row.querySelector('.tx-date').value,
+      description: row.querySelector('.tx-desc').value,
+      amount: parseFloat(row.querySelector('.tx-amount').value) || 0,
+    })).filter(t => t.description);
+
+    if (!transactions.length) { log('⚠ Add at least one transaction', 'warn'); return; }
+
+    setBtn('manualLabel', true, '⬡ Add to Notion');
+    log(`Adding ${transactions.length} manual transactions...`, 'warn');
+    log('<span class="thinking">Claude is categorizing and analyzing...</span>', 'dim');
+
+    try {
+      const r = await fetch('/api/add-manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactions, db_id: dbId }),
+      });
+      const d = await r.json();
+      if (d.status === 'success') {
+        const s = d.summary || {};
+        log(`✓ ${s.added ?? transactions.length} transactions added`, 'ok');
+        if (s.anomalies) log(`⚠ ${s.anomalies} anomalies flagged`, 'warn');
+        setStat('statAdded', (parseInt(document.getElementById('statAdded').textContent) || 0) + (s.added ?? transactions.length));
+        setStat('statAnomalies', s.anomalies ?? 0);
+      } else { log(`✗ ${JSON.stringify(d)}`, 'err'); }
+    } catch (e) { log(`✗ ${e.message}`, 'err'); }
+    setBtn('manualLabel', false, '⬡ Add to Notion');
+  }
+
+  // ── Step 3: Report ────────────────────────────────────────────────────────────
+  async function generateReport() {
+    const dbId = document.getElementById('reportDbId').value.trim();
+    const rpId = document.getElementById('reportsPageId').value.trim();
+    const month = document.getElementById('reportMonth').value;
+    const year = document.getElementById('reportYear').value;
+    if (!dbId || !rpId) { log('⚠ Fill in DB ID and Reports Page ID', 'warn'); return; }
+
+    setBtn('reportLabel', true, '⬡ Generate Report in Notion');
+    log(`Generating ${month} ${year} report...`, 'warn');
+    log('<span class="thinking">Claude is reading transactions, computing analytics, writing report...</span>', 'dim');
+
+    try {
+      const r = await fetch('/api/generate-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ db_id: dbId, reports_page_id: rpId, month, year: parseInt(year) }),
+      });
+      const d = await r.json();
+      if (d.status === 'success') {
+        const s = d.summary || {};
+        log(`✓ ${month} ${year} report created in Notion`, 'ok');
+        if (s.total_income) setStat('statIncome', `$${s.total_income}`);
+        if (s.total_expenses) setStat('statExpenses', `$${s.total_expenses}`);
+        if (s.anomalies) setStat('statAnomalies', s.anomalies);
+        addLink(`${month} ${year} Report`, s.report_url);
+        document.getElementById('step3').classList.add('done');
+      } else { log(`✗ ${JSON.stringify(d)}`, 'err'); }
+    } catch (e) { log(`✗ ${e.message}`, 'err'); }
+    setBtn('reportLabel', false, '⬡ Generate Report in Notion');
+  }
+
+  // ── Step 4: Budget ────────────────────────────────────────────────────────────
+  async function runBudgetCheck() {
+    const dbId = document.getElementById('budgetDbId').value.trim();
+    const month = document.getElementById('budgetMonth').value;
+    if (!dbId) { log('⚠ Enter the Expenses DB ID first', 'warn'); return; }
+
+    const budgets = {};
+    document.querySelectorAll('.budget-input').forEach(input => {
+      budgets[input.dataset.cat] = parseFloat(input.value) || 0;
+    });
+
+    setBtn('budgetLabel', true, '⚠ Run Budget Check in Notion');
+    log(`Running ${month} budget analysis...`, 'warn');
+    log('<span class="thinking">Claude is comparing actuals vs limits and writing alert page...</span>', 'dim');
+
+    try {
+      const r = await fetch('/api/budget-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ db_id: dbId, month, budgets }),
+      });
+      const d = await r.json();
+      if (d.status === 'success') {
+        const s = d.summary || {};
+        log(`✓ Budget check complete`, 'ok');
+        if (s.over_budget) log(`⚠ ${s.over_budget} categories over budget`, 'warn');
+        addLink(`${month} Budget Alert`, s.alert_url);
+        document.getElementById('step4').classList.add('done');
+      } else { log(`✗ ${JSON.stringify(d)}`, 'err'); }
+    } catch (e) { log(`✗ ${e.message}`, 'err'); }
+    setBtn('budgetLabel', false, '⚠ Run Budget Check in Notion');
+  }
+</script>
+</body>
+</html>
