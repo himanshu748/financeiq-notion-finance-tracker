@@ -474,7 +474,7 @@ input:focus, select:focus, textarea:focus {
     <div id="panel2" style="display:none">
       <div class="section-flag red">Step 2 — Import</div>
       <h2>Add Your Transactions</h2>
-      <div class="byline">Upload a bank CSV export or enter transactions manually — Claude categorizes everything</div>
+      <div class="byline">Upload a bank CSV export or enter transactions manually — AI categorizes everything</div>
 
       <div class="card">
         <label class="field-label">Expenses Database ID <span style="color:var(--accent)">*</span></label>
@@ -516,7 +516,7 @@ input:focus, select:focus, textarea:focus {
     <div id="panel3" style="display:none">
       <div class="section-flag gold">Step 3 — Analysis</div>
       <h2>Generate Monthly Report</h2>
-      <div class="byline">Claude reads your Notion data and writes a full financial analysis with insights</div>
+      <div class="byline">AI reads your Notion data and writes a full financial analysis with insights</div>
 
       <div class="card">
         <label class="field-label">Expenses Database ID</label>
@@ -551,7 +551,7 @@ input:focus, select:focus, textarea:focus {
     <div id="panel4" style="display:none">
       <div class="section-flag green">Step 4 — Budget Check</div>
       <h2>Budget vs Actual Analysis</h2>
-      <div class="byline">Set your monthly limits — Claude compares actuals and creates an alert page</div>
+      <div class="byline">Set your monthly limits — AI compares actuals and creates an alert page</div>
 
       <div class="card">
         <label class="field-label">Expenses Database ID</label>
@@ -661,7 +661,7 @@ input:focus, select:focus, textarea:focus {
     try {
       const r = await fetch('/api/health');
       const d = await r.json();
-      const ok = d.anthropic_key && d.notion_token;
+      const ok = d.hf_key && d.notion_token;
       document.getElementById('statusDot').className = 'dot' + (ok ? ' ok' : '');
       document.getElementById('statusText').textContent = ok ? 'API Connected' : 'Missing env vars';
       if (d.parent_page_id) {
@@ -719,7 +719,7 @@ input:focus, select:focus, textarea:focus {
     const pid = document.getElementById('parentPageId').value.trim();
     setBtn('setupLabel', true, '⬡ Create FinanceIQ Workspace in Notion');
     log('Setting up Notion workspace...', 'warn');
-    log('<span class="thinking">Claude is creating your Expenses DB and Reports folder...</span>', 'dim');
+    log('<span class="thinking">AI is creating your Expenses DB and Reports folder...</span>', 'dim');
     try {
       const r = await fetch('/api/setup', {
         method: 'POST',
@@ -778,7 +778,7 @@ input:focus, select:focus, textarea:focus {
 
     setBtn('uploadLabel', true, '⬡ Categorize & Import to Notion');
     log(`Parsing ${currentFile.name}...`, 'warn');
-    log('<span class="thinking">Claude is reading, categorizing, and flagging anomalies...</span>', 'dim');
+    log('<span class="thinking">AI is reading, categorizing, and flagging anomalies...</span>', 'dim');
 
     const form = new FormData();
     form.append('file', currentFile);
@@ -835,7 +835,7 @@ input:focus, select:focus, textarea:focus {
 
     setBtn('manualLabel', true, '⬡ Add to Notion');
     log(`Adding ${transactions.length} manual transactions...`, 'warn');
-    log('<span class="thinking">Claude is categorizing and analyzing...</span>', 'dim');
+    log('<span class="thinking">AI is categorizing and analyzing...</span>', 'dim');
 
     try {
       const r = await fetch('/api/add-manual', {
@@ -865,7 +865,7 @@ input:focus, select:focus, textarea:focus {
 
     setBtn('reportLabel', true, '⬡ Generate Report in Notion');
     log(`Generating ${month} ${year} report...`, 'warn');
-    log('<span class="thinking">Claude is reading transactions, computing analytics, writing report...</span>', 'dim');
+    log('<span class="thinking">AI is reading transactions, computing analytics, writing report...</span>', 'dim');
 
     try {
       const r = await fetch('/api/generate-report', {
@@ -900,7 +900,7 @@ input:focus, select:focus, textarea:focus {
 
     setBtn('budgetLabel', true, '⚠ Run Budget Check in Notion');
     log(`Running ${month} budget analysis...`, 'warn');
-    log('<span class="thinking">Claude is comparing actuals vs limits and writing alert page...</span>', 'dim');
+    log('<span class="thinking">AI is comparing actuals vs limits and writing alert page...</span>', 'dim');
 
     try {
       const r = await fetch('/api/budget-check', {
