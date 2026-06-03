@@ -20,8 +20,14 @@ from pydantic import BaseModel
 from typing import Optional, List
 from huggingface_hub import InferenceClient
 import httpx
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+
+try:
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+except ModuleNotFoundError:
+    ClientSession = None
+    StdioServerParameters = None
+    stdio_client = None
 
 log = logging.getLogger("financeiq")
 
@@ -101,9 +107,23 @@ class NotionHTTPFallback:
             return r.json()
 
 
+def mcp_package_available() -> bool:
+    return ClientSession is not None and StdioServerParameters is not None and stdio_client is not None
+
+
+def notion_transport_name() -> str:
+    return "mcp-stdio" if mcp_package_available() else "rest-fallback"
+
+
 @asynccontextmanager
 async def notion_mcp():
     """Spin up Notion MCP stdio server and yield a ClientSession."""
+    if not NOTION_TOKEN:
+        raise HTTPException(status_code=500, detail="NOTION_TOKEN not set")
+    if not mcp_package_available():
+        log.warning("mcp package is not installed; using Notion REST fallback.")
+        yield NotionHTTPFallback()
+        return
     params = StdioServerParameters(
         command="npx",
         args=["-y", "@notionhq/notion-mcp-server"],
@@ -576,7 +596,7 @@ async def health():
     try:
         async with notion_session() as mcp:
             me = await mcp_call(mcp, "API-get-self", {})
-            mcp_ok = bool(me.get("id"))
+            mcp_ok = notion_transport_name() == "mcp-stdio" and bool(me.get("id"))
     except Exception:
         pass
     return {
@@ -585,6 +605,7 @@ async def health():
         "notion_token": bool(NOTION_TOKEN),
         "parent_page_id": bool(NOTION_PARENT_PAGE_ID),
         "mcp_connected": mcp_ok,
+        "notion_transport": notion_transport_name(),
     }
 
 

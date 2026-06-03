@@ -2,6 +2,8 @@
 
 > Powered by HuggingFace + Notion MCP — categorizes expenses, flags anomalies, generates financial reports directly in Notion.
 
+`/api/health` reports `notion_transport` so MCP stdio and REST fallback are not confused. The primary Notion path is `npx -y @notionhq/notion-mcp-server` with `NOTION_TOKEN` passed to the server environment.
+
 ## Features
 
 - **One-click Notion setup** — creates Expenses database + Reports page
