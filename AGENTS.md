@@ -13,4 +13,6 @@
 - Notion MCP stdio is the primary path: `npx -y @notionhq/notion-mcp-server` with `NOTION_TOKEN`.
 - Keep the REST client as fallback only when the Python MCP package is unavailable.
 - `/api/health` must report `notion_transport` so MCP stdio and REST fallback are not confused.
+- `HF_TOKEN` may be used as a local fallback alias for `HF_API_KEY`; never commit real provider tokens.
+- Notion REST fallback errors should stay sanitized and raise `HTTPException` instead of returning API error dicts as app data.
 - Do not commit `.env`, caches, generated output, or Notion page IDs/tokens.

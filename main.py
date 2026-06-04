@@ -36,7 +36,7 @@ load_dotenv()
 app = FastAPI(title="FinanceIQ")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-HF_API_KEY = os.environ.get("HF_API_KEY", "")
+HF_API_KEY = os.environ.get("HF_API_KEY") or os.environ.get("HF_TOKEN", "")
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 NOTION_PARENT_PAGE_ID = os.environ.get("NOTION_PARENT_PAGE_ID", "")
 HF_MODEL = os.environ.get("HF_MODEL", "Qwen/Qwen2.5-72B-Instruct")
@@ -72,6 +72,40 @@ class NotionHTTPFallback:
             "Content-Type": "application/json",
         }
 
+    @staticmethod
+    def _required(payload: dict, key: str, tool: str):
+        try:
+            return payload.pop(key)
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Notion REST fallback missing required argument '{key}' for {tool}.",
+            ) from exc
+
+    @staticmethod
+    def _json_response(response: httpx.Response) -> dict:
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            raise HTTPException(
+                status_code=502,
+                detail=f"Notion REST request failed with HTTP {status}.",
+            ) from exc
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail="Notion REST returned invalid JSON.",
+            ) from exc
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=502,
+                detail="Notion REST returned an unexpected payload shape.",
+            )
+        return payload
+
     async def call_tool(self, tool: str, args: dict) -> dict:
         payload = dict(args)
         async with httpx.AsyncClient(timeout=30) as c:
@@ -82,13 +116,13 @@ class NotionHTTPFallback:
             elif tool == "API-post-database":
                 r = await c.post(f"{NOTION_API}/databases", headers=self._h(), json=payload)
             elif tool == "API-post-database-query":
-                db_id = payload.pop("database_id")
+                db_id = self._required(payload, "database_id", tool)
                 r = await c.post(
                     f"{NOTION_API}/databases/{db_id}/query",
                     headers=self._h(), json=payload,
                 )
             elif tool == "API-get-block-children":
-                bid = payload.pop("block_id")
+                bid = self._required(payload, "block_id", tool)
                 r = await c.get(
                     f"{NOTION_API}/blocks/{bid}/children",
                     headers=self._h(), params=payload,
@@ -96,16 +130,19 @@ class NotionHTTPFallback:
             elif tool == "API-get-self":
                 r = await c.get(f"{NOTION_API}/users/me", headers=self._h())
             elif tool == "API-patch-page":
-                pid = payload.pop("page_id")
+                pid = self._required(payload, "page_id", tool)
                 r = await c.patch(
                     f"{NOTION_API}/pages/{pid}", headers=self._h(), json=payload,
                 )
             elif tool == "API-retrieve-a-page":
-                pid = payload.pop("page_id")
+                pid = self._required(payload, "page_id", tool)
                 r = await c.get(f"{NOTION_API}/pages/{pid}", headers=self._h())
             else:
-                return {"error": f"Unknown tool: {tool}"}
-            return r.json()
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Unknown Notion tool: {tool}.",
+                )
+            return self._json_response(r)
 
 
 def mcp_package_available() -> bool:

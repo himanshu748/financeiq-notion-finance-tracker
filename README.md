@@ -33,10 +33,12 @@ Open [http://localhost:8000](http://localhost:8000) in your browser.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `HF_API_KEY` | Yes | Your HuggingFace API key |
-| `HF_MODEL` | No | Model ID (default: mistralai/Mistral-Small-3.1-24B-Instruct-2503) |
-| `NOTION_TOKEN` | Yes | Notion integration token |
+| `HF_API_KEY` | Yes | Your HuggingFace API key; local runs may use `HF_TOKEN` as a fallback alias |
+| `HF_MODEL` | No | Model ID (default: `Qwen/Qwen2.5-72B-Instruct`) |
+| `NOTION_TOKEN` | Yes | Notion token used by the MCP stdio server or REST fallback |
 | `NOTION_PARENT_PAGE_ID` | No | Parent page for workspace (can set in UI) |
+
+Real secrets belong only in a local `.env`, process environment, or deployment dashboard. Leave `.env.example` blank. If `NOTION_TOKEN` is not loaded, live Notion setup/import/report/budget routes cannot be tested; health and static routes still work. The REST fallback raises sanitized errors for unsupported tools, missing Notion arguments, non-2xx Notion responses, or invalid Notion JSON.
 
 ## How It Works
 
