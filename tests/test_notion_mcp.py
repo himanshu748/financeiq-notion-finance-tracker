@@ -113,6 +113,13 @@ class FakeAsyncClient:
         return self.next_response or FakeResponse({"ok": True})
 
 
+def test_notion_api_key_alias(monkeypatch):
+    monkeypatch.delenv("NOTION_TOKEN", raising=False)
+    monkeypatch.setenv("NOTION_API_KEY", "ntn_test")
+
+    assert main.notion_token_value() == "ntn_test"
+
+
 @pytest.mark.asyncio
 async def test_notion_mcp_uses_official_stdio_server(monkeypatch):
     monkeypatch.setattr(main, "NOTION_TOKEN", "ntn_test")

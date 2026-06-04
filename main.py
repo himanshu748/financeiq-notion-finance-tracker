@@ -37,9 +37,15 @@ app = FastAPI(title="FinanceIQ")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 HF_API_KEY = os.environ.get("HF_API_KEY") or os.environ.get("HF_TOKEN", "")
-NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 NOTION_PARENT_PAGE_ID = os.environ.get("NOTION_PARENT_PAGE_ID", "")
 HF_MODEL = os.environ.get("HF_MODEL", "Qwen/Qwen2.5-72B-Instruct")
+
+
+def notion_token_value() -> str:
+    return os.environ.get("NOTION_TOKEN", "") or os.environ.get("NOTION_API_KEY", "")
+
+
+NOTION_TOKEN = notion_token_value()
 
 
 # ─── Constants ────────────────────────────────────────────────────────────────
