@@ -36,16 +36,25 @@ load_dotenv()
 app = FastAPI(title="FinanceIQ")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-HF_API_KEY = os.environ.get("HF_API_KEY") or os.environ.get("HF_TOKEN", "")
-NOTION_PARENT_PAGE_ID = os.environ.get("NOTION_PARENT_PAGE_ID", "")
-HF_MODEL = os.environ.get("HF_MODEL", "Qwen/Qwen2.5-72B-Instruct")
+
+def get_env(name: str, default: str = "") -> str:
+    return os.environ.get(name, default).strip()
+
+
+def hf_api_key() -> str:
+    return get_env("HF_API_KEY") or get_env("HF_TOKEN")
+
+
+def notion_parent_page_id() -> str:
+    return get_env("NOTION_PARENT_PAGE_ID")
+
+
+def hf_model() -> str:
+    return get_env("HF_MODEL", "Qwen/Qwen2.5-72B-Instruct")
 
 
 def notion_token_value() -> str:
-    return os.environ.get("NOTION_TOKEN", "") or os.environ.get("NOTION_API_KEY", "")
-
-
-NOTION_TOKEN = notion_token_value()
+    return get_env("NOTION_TOKEN") or get_env("NOTION_API_KEY")
 
 
 # ─── Constants ────────────────────────────────────────────────────────────────
@@ -73,7 +82,7 @@ class NotionHTTPFallback:
 
     def _h(self):
         return {
-            "Authorization": f"Bearer {NOTION_TOKEN}",
+            "Authorization": f"Bearer {notion_token_value()}",
             "Notion-Version": NOTION_VER,
             "Content-Type": "application/json",
         }
@@ -162,7 +171,8 @@ def notion_transport_name() -> str:
 @asynccontextmanager
 async def notion_mcp():
     """Spin up Notion MCP stdio server and yield a ClientSession."""
-    if not NOTION_TOKEN:
+    token = notion_token_value()
+    if not token:
         raise HTTPException(status_code=500, detail="NOTION_TOKEN not set")
     if not mcp_package_available():
         log.warning("mcp package is not installed; using Notion REST fallback.")
@@ -171,7 +181,7 @@ async def notion_mcp():
     params = StdioServerParameters(
         command="npx",
         args=["-y", "@notionhq/notion-mcp-server"],
-        env={**os.environ, "NOTION_TOKEN": NOTION_TOKEN},
+        env={**os.environ, "NOTION_TOKEN": token},
     )
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
@@ -280,7 +290,7 @@ async def _legacy_mcp_add_db_entry(session, db_id: str, properties: dict) -> dic
 # ─── HuggingFace ─────────────────────────────────────────────────────────────
 
 async def generate_text(system: str, user_msg: str) -> str:
-    hf = InferenceClient(model=HF_MODEL, token=HF_API_KEY)
+    hf = InferenceClient(model=hf_model(), token=hf_api_key())
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": user_msg},
@@ -298,7 +308,13 @@ def _parse_json(raw: str) -> dict:
     s, e = raw.find("{"), raw.rfind("}") + 1
     if s == -1 or e <= s:
         raise HTTPException(status_code=502, detail="Model did not return valid JSON")
-    return json.loads(raw[s:e])
+    try:
+        payload = json.loads(raw[s:e])
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail="Model did not return valid JSON") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=502, detail="Model did not return a JSON object")
+    return payload
 
 
 # ─── System Prompts ──────────────────────────────────────────────────────────
@@ -645,9 +661,9 @@ async def health():
         pass
     return {
         "status": "ok",
-        "hf_key": bool(HF_API_KEY),
-        "notion_token": bool(NOTION_TOKEN),
-        "parent_page_id": bool(NOTION_PARENT_PAGE_ID),
+        "hf_key": bool(hf_api_key()),
+        "notion_token": bool(notion_token_value()),
+        "parent_page_id": bool(notion_parent_page_id()),
         "mcp_connected": mcp_ok,
         "notion_transport": notion_transport_name(),
     }
@@ -656,11 +672,11 @@ async def health():
 @app.post("/api/setup")
 async def setup_workspace(req: SetupRequest):
     """Create the FinanceIQ workspace, Expenses DB, and Reports page in Notion."""
-    if not HF_API_KEY:
+    if not hf_api_key():
         raise HTTPException(status_code=500, detail="HF_API_KEY not set")
-    if not NOTION_TOKEN:
+    if not notion_token_value():
         raise HTTPException(status_code=500, detail="NOTION_TOKEN not set")
-    parent_id = req.parent_page_id or NOTION_PARENT_PAGE_ID
+    parent_id = req.parent_page_id or notion_parent_page_id()
     if not parent_id:
         raise HTTPException(status_code=400, detail="parent_page_id required")
 
@@ -733,9 +749,9 @@ async def upload_csv(
     db_id: str = Form(...),
 ):
     """Upload a bank CSV, AI categorizes and loads into Notion."""
-    if not HF_API_KEY:
+    if not hf_api_key():
         raise HTTPException(status_code=500, detail="HF_API_KEY not set")
-    if not NOTION_TOKEN:
+    if not notion_token_value():
         raise HTTPException(status_code=500, detail="NOTION_TOKEN not set")
 
     content = (await file.read()).decode("utf-8", errors="ignore")
@@ -780,9 +796,9 @@ async def upload_csv(
 @app.post("/api/add-manual")
 async def add_manual(req: ManualTransactionRequest):
     """Add manually-entered transactions."""
-    if not HF_API_KEY:
+    if not hf_api_key():
         raise HTTPException(status_code=500, detail="HF_API_KEY not set")
-    if not NOTION_TOKEN:
+    if not notion_token_value():
         raise HTTPException(status_code=500, detail="NOTION_TOKEN not set")
 
     # Step 1: Use HF to categorize transactions into JSON
@@ -821,9 +837,9 @@ async def add_manual(req: ManualTransactionRequest):
 @app.post("/api/generate-report")
 async def generate_report(req: ReportRequest):
     """Generate a monthly financial report page in Notion."""
-    if not HF_API_KEY:
+    if not hf_api_key():
         raise HTTPException(status_code=500, detail="HF_API_KEY not set")
-    if not NOTION_TOKEN:
+    if not notion_token_value():
         raise HTTPException(status_code=500, detail="NOTION_TOKEN not set")
 
     year = req.year or date.today().year
@@ -869,12 +885,12 @@ async def generate_report(req: ReportRequest):
 @app.post("/api/budget-check")
 async def budget_check(req: BudgetRequest):
     """Compare actual spend vs budget and create alert page."""
-    if not HF_API_KEY:
+    if not hf_api_key():
         raise HTTPException(status_code=500, detail="HF_API_KEY not set")
-    if not NOTION_TOKEN:
+    if not notion_token_value():
         raise HTTPException(status_code=500, detail="NOTION_TOKEN not set")
 
-    parent_id = req.parent_page_id or NOTION_PARENT_PAGE_ID
+    parent_id = req.parent_page_id or notion_parent_page_id()
 
     async with notion_session() as mcp:
         # Step 1: Read expenses from Notion via MCP (API-post-database-query)

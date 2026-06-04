@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 
 import main
 
@@ -115,14 +117,53 @@ class FakeAsyncClient:
 
 def test_notion_api_key_alias(monkeypatch):
     monkeypatch.delenv("NOTION_TOKEN", raising=False)
-    monkeypatch.setenv("NOTION_API_KEY", "ntn_test")
+    monkeypatch.setenv("NOTION_API_KEY", "  ntn_test  ")
 
     assert main.notion_token_value() == "ntn_test"
 
 
+def test_hf_token_alias_configures_health(monkeypatch):
+    monkeypatch.delenv("HF_API_KEY", raising=False)
+    monkeypatch.setenv("HF_TOKEN", "  hf_test  ")
+    monkeypatch.delenv("NOTION_TOKEN", raising=False)
+    monkeypatch.delenv("NOTION_API_KEY", raising=False)
+    monkeypatch.delenv("NOTION_PARENT_PAGE_ID", raising=False)
+
+    response = TestClient(main.app).get("/api/health")
+
+    assert response.status_code == 200
+    assert response.json()["hf_key"] is True
+
+
+def test_health_uses_current_environment(monkeypatch):
+    @asynccontextmanager
+    async def failing_notion_session():
+        raise RuntimeError("skip live MCP connection in config-only health test")
+        yield
+
+    monkeypatch.setattr(main, "notion_session", failing_notion_session)
+    monkeypatch.delenv("HF_API_KEY", raising=False)
+    monkeypatch.delenv("HF_TOKEN", raising=False)
+    monkeypatch.delenv("NOTION_TOKEN", raising=False)
+    monkeypatch.delenv("NOTION_API_KEY", raising=False)
+    monkeypatch.delenv("NOTION_PARENT_PAGE_ID", raising=False)
+
+    client = TestClient(main.app)
+    empty = client.get("/api/health").json()
+    assert empty["hf_key"] is False
+    assert empty["notion_token"] is False
+    assert empty["parent_page_id"] is False
+
+    monkeypatch.setenv("NOTION_API_KEY", "ntn_test")
+    monkeypatch.setenv("NOTION_PARENT_PAGE_ID", "page_123")
+    configured = client.get("/api/health").json()
+    assert configured["notion_token"] is True
+    assert configured["parent_page_id"] is True
+
+
 @pytest.mark.asyncio
 async def test_notion_mcp_uses_official_stdio_server(monkeypatch):
-    monkeypatch.setattr(main, "NOTION_TOKEN", "ntn_test")
+    monkeypatch.setenv("NOTION_TOKEN", "ntn_test")
     monkeypatch.setattr(main, "StdioServerParameters", FakeServerParameters)
     monkeypatch.setattr(main, "ClientSession", FakeClientSession)
     monkeypatch.setattr(main, "stdio_client", lambda params: FakeStdioClient(params))
@@ -136,11 +177,28 @@ async def test_notion_mcp_uses_official_stdio_server(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_notion_mcp_requires_token(monkeypatch):
-    monkeypatch.setattr(main, "NOTION_TOKEN", "")
+    monkeypatch.delenv("NOTION_TOKEN", raising=False)
+    monkeypatch.delenv("NOTION_API_KEY", raising=False)
 
     with pytest.raises(main.HTTPException, match="NOTION_TOKEN"):
         async with main.notion_session():
             pass
+
+
+def test_parse_json_rejects_malformed_model_payload():
+    with pytest.raises(main.HTTPException) as exc_info:
+        main._parse_json('{"summary": "broken",')
+
+    assert exc_info.value.status_code == 502
+    assert exc_info.value.detail == "Model did not return valid JSON"
+
+
+def test_parse_json_rejects_payload_without_object():
+    with pytest.raises(main.HTTPException) as exc_info:
+        main._parse_json('["not", "object"]')
+
+    assert exc_info.value.status_code == 502
+    assert exc_info.value.detail == "Model did not return valid JSON"
 
 
 @pytest.mark.asyncio
