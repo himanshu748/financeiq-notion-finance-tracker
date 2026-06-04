@@ -73,34 +73,35 @@ class NotionHTTPFallback:
         }
 
     async def call_tool(self, tool: str, args: dict) -> dict:
+        payload = dict(args)
         async with httpx.AsyncClient(timeout=30) as c:
             if tool == "API-post-page":
-                r = await c.post(f"{NOTION_API}/pages", headers=self._h(), json=args)
+                r = await c.post(f"{NOTION_API}/pages", headers=self._h(), json=payload)
             elif tool == "API-post-search":
-                r = await c.post(f"{NOTION_API}/search", headers=self._h(), json=args)
+                r = await c.post(f"{NOTION_API}/search", headers=self._h(), json=payload)
             elif tool == "API-post-database":
-                r = await c.post(f"{NOTION_API}/databases", headers=self._h(), json=args)
+                r = await c.post(f"{NOTION_API}/databases", headers=self._h(), json=payload)
             elif tool == "API-post-database-query":
-                db_id = args.pop("database_id")
+                db_id = payload.pop("database_id")
                 r = await c.post(
                     f"{NOTION_API}/databases/{db_id}/query",
-                    headers=self._h(), json=args,
+                    headers=self._h(), json=payload,
                 )
             elif tool == "API-get-block-children":
-                bid = args.pop("block_id")
+                bid = payload.pop("block_id")
                 r = await c.get(
                     f"{NOTION_API}/blocks/{bid}/children",
-                    headers=self._h(), params=args,
+                    headers=self._h(), params=payload,
                 )
             elif tool == "API-get-self":
                 r = await c.get(f"{NOTION_API}/users/me", headers=self._h())
             elif tool == "API-patch-page":
-                pid = args.pop("page_id")
+                pid = payload.pop("page_id")
                 r = await c.patch(
-                    f"{NOTION_API}/pages/{pid}", headers=self._h(), json=args,
+                    f"{NOTION_API}/pages/{pid}", headers=self._h(), json=payload,
                 )
             elif tool == "API-retrieve-a-page":
-                pid = args.pop("page_id")
+                pid = payload.pop("page_id")
                 r = await c.get(f"{NOTION_API}/pages/{pid}", headers=self._h())
             else:
                 return {"error": f"Unknown tool: {tool}"}
